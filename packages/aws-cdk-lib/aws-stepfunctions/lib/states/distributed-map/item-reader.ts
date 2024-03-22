@@ -124,7 +124,7 @@ export class S3ObjectsItemReader implements IItemReader {
   }
 
   /**
-   * Compile policy statements to provide relevent permissions to the state machine
+   * Compile policy statements to provide relevant permissions to the state machine
    */
   public providePolicyStatements(): iam.PolicyStatement[] {
     return [
@@ -145,7 +145,7 @@ export interface S3FileItemReaderProps extends ItemReaderProps {
   /**
    * Key of file stored in S3 bucket containing an array to iterate over
    */
-  readonly key: string;
+  readonly key: string | { [key: string]: string };
 }
 
 /**
@@ -160,7 +160,7 @@ abstract class S3FileItemReader implements IItemReader {
   /**
    * S3 key of a file with a list to iterate over
    */
-  readonly key: string;
+  readonly key: string | { [key: string ]: string };
 
   /**
    * ARN for the `getObject` method of the S3 API
@@ -205,7 +205,7 @@ abstract class S3FileItemReader implements IItemReader {
       },
       Parameters: {
         Bucket: this.bucket.bucketName,
-        Key: this.key,
+        ...(typeof this.key === 'string' ? { Key: this.key } : this.key),
       },
     });
   }

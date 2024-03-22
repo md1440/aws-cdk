@@ -378,6 +378,78 @@ describe('Distributed Map State', () => {
     });
   }),
 
+  test('State Machine With Distributed Map State and dynamic ItemReader key property', () => {
+    // GIVEN
+    const stack = new cdk.Stack();
+    const readerBucket = new s3.Bucket(stack, 'TestBucket');
+
+    //WHEN
+    const map = new stepfunctions.DistributedMap(stack, 'Map State', {
+      maxConcurrency: 1,
+      itemReader: new stepfunctions.S3CsvItemReader({
+        bucket: readerBucket,
+        key: { 'Key.$': '$.fileName' },
+        csvHeaders: CsvHeaders.useFirstRow(),
+      }),
+      itemSelector: {
+        foo: 'foo',
+        bar: stepfunctions.JsonPath.stringAt('$.bar'),
+      },
+    });
+    map.itemProcessor(new stepfunctions.Pass(stack, 'Pass State'));
+
+    //THEN
+    expect(render(map)).toStrictEqual({
+      StartAt: 'Map State',
+      States: {
+        'Map State': {
+          Type: 'Map',
+          End: true,
+          ItemSelector: {
+            'foo': 'foo',
+            'bar.$': '$.bar',
+          },
+          ItemProcessor: {
+            ProcessorConfig: {
+              Mode: stepfunctions.ProcessorMode.DISTRIBUTED,
+              ExecutionType: stepfunctions.StateMachineType.STANDARD,
+            },
+            StartAt: 'Pass State',
+            States: {
+              'Pass State': {
+                Type: 'Pass',
+                End: true,
+              },
+            },
+          },
+          ItemReader: {
+            Resource: {
+              'Fn::Join': [
+                '',
+                [
+                  'arn:',
+                  { Ref: 'AWS::Partition' },
+                  ':states:::s3:getObject',
+                ],
+              ],
+            },
+            ReaderConfig: {
+              InputType: 'CSV',
+              CSVHeaderLocation: 'FIRST_ROW',
+            },
+            Parameters: {
+              'Bucket': {
+                Ref: stack.getLogicalId(readerBucket.node.defaultChild as s3.CfnBucket),
+              },
+              'Key.$': '$.fileName',
+            },
+          },
+          MaxConcurrency: 1,
+        },
+      },
+    });
+  }),
+
   test('State Machine With Distributed Map State and Given S3CsvItemReader', () => {
     // GIVEN
     const stack = new cdk.Stack();
